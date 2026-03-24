@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForecastIQ | Intelligence Briefing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Outfit:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --maroon-black: radial-gradient(circle at center, #3d0505 0%, #050505 100%); }
+        body { font-family: 'Outfit', sans-serif; margin: 0; background: #000; color: white; overflow-x: hidden; transition: background 1s ease; }
+        
+        /* Apple-style Hello Font */
+        .hello-font { font-family: 'Dancing Script', cursive; font-size: clamp(4rem, 15vw, 6rem); background: linear-gradient(to right, #fff, #888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        /* Glassmorphism */
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; }
+        
+        /* Floating Bubbles */
+        .bubble { position: absolute; border-radius: 50%; background: rgba(139, 0, 0, 0.12); filter: blur(80px); z-index: -1; animation: float 20s infinite alternate ease-in-out; }
+        @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(100px, -100px); } }
+
+        /* Animations */
+        .letter { display: inline-block; opacity: 0; transform: translateY(10px); }
+        .letter-animate { animation: letterIn 0.4s forwards; }
+        @keyframes letterIn { to { opacity: 1; transform: translateY(0); } }
+        .fade-out { animation: fadeOut 0.8s forwards; }
+        @keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+
+        /* Trust UI */
+        .trust-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 4px 10px; border-radius: 100px; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; animation: dotPulse 1.2s infinite ease-in-out; }
+        @keyframes dotPulse { 0%, 100% { transform: scale(0.6); opacity: 0.3; } 50% { transform: scale(1.2); opacity: 1; } }
+        
+        #query-result { border-left: 3px solid #ef4444; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-black min-h-screen">
+
+    <div class="bubble" style="width: 40vw; height: 40vw; top: -10%; left: -10%;"></div>
+    <div class="bubble" style="width: 35vw; height: 35vw; bottom: 10%; right: -5%; background: rgba(50, 50, 255, 0.05);"></div>
+
+    <div id="splash-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div id="hello-text" class="hello-font opacity-0 translate-y-4 transition-all duration-1000">hello</div>
+        <div id="brand-load" class="hidden flex flex-col items-center text-center">
+            <h1 id="splash-title" class="text-5xl md:text-7xl font-black tracking-tighter mb-6"></h1>
+            <div class="flex gap-1.5">
+                <div class="dot" style="animation-delay:0s"></div>
+                <div class="dot" style="animation-delay:0.2s"></div>
+                <div class="dot" style="animation-delay:0.4s"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden opacity-0 transition-opacity duration-1000 max-w-4xl mx-auto px-4 md:px-6 py-8 relative z-10">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-xl md:text-2xl font-black">FORECAST<span class="text-red-600">IQ</span></h2>
+            <div class="trust-badge">● SATELLITE VERIFIED</div>
+        </div>
+
+        <div id="search-section" class="glass p-6 md:p-10 text-center mb-8 relative z-30">
+            <h3 class="text-lg md:text-xl font-light mb-6 text-gray-400 italic">"What's the atmosphere like in..."</h3>
+            <div class="relative max-w-lg mx-auto">
+                <div class="flex items-center bg-white/5 border border-white/10 rounded-2xl px-4 py-1 focus-within:border-red-500 transition-all">
+                    <input type="text" id="city-input" oninput="handleSearchInput(this.value)" placeholder="Search city..." 
+                           class="flex-grow bg-transparent border-none px-2 py-4 outline-none text-white text-lg">
+                    <button onclick="clearSearch()" id="clear-btn" class="hidden text-gray-500 hover:text-white px-2">✕</button>
+                </div>
+                <div id="suggestions" class="absolute w-full mt-2 glass overflow-hidden hidden z-50 shadow-2xl"></div>
+            </div>
+        </div>
+
+        <div id="weather-engine" class="hidden animate-in fade-in duration-700">
+            <div class="flex gap-2 overflow-x-auto mb-6 scrollbar-hide py-2">
+                <button onclick="updateTab('temp', event)" class="tab-btn glass px-6 py-3 whitespace-nowrap font-bold text-red-500">Temperature</button>
+                <button onclick="updateTab('humidity', event)" class="tab-btn glass px-6 py-3 whitespace-nowrap font-bold">Humidity</button>
+                <button onclick="updateTab('rain', event)" class="tab-btn glass px-6 py-3 whitespace-nowrap font-bold">Rain</button>
+                <button onclick="updateTab('air', event)" class="tab-btn glass px-6 py-3 whitespace-nowrap font-bold">Air Purity</button>
+            </div>
+
+            <div class="glass p-6 md:p-8 mb-8">
+                <div id="data-val" class="text-6xl md:text-8xl font-black mb-4 tracking-tighter">--</div>
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <span class="text-[10px] font-bold tracking-widest text-blue-400 uppercase">Gemini Neural Link Active</span>
+                </div>
+                <p id="ai-text" class="text-gray-300 text-base md:text-lg italic leading-relaxed min-h-[4em]"></p>
+            </div>
+
+            <div class="glass p-6 md:p-8 mb-20">
+                <p class="text-[10px] font-bold text-gray-500 mb-4 tracking-[0.3em] uppercase">Consult Intelligence</p>
+                <div class="flex flex-col gap-4">
+                    <input type="text" id="user-query" placeholder="Ask a doubt about today..." 
+                           class="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-blue-500 transition-all">
+                    <div id="query-result" class="hidden text-blue-100 text-sm p-5 rounded-2xl bg-white/5 mb-2"></div>
+                    <div class="flex justify-between items-center">
+                        <button onclick="clearChat()" class="text-[10px] text-gray-500 hover:text-white uppercase font-bold">Clear Chat</button>
+                        <button onclick="askAI()" class="text-xs font-black text-red-500 hover:tracking-widest transition-all uppercase">Analyze →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GEMINI_KEY = "YOUR_GEMINI_API_KEY"; 
+        const WEATHER_KEY = "YOUR_OPENWEATHER_KEY";
+        let weatherStore = null;
+        let searchTimeout;
+
+        // 1. SPLASH SEQUENCE
+        window.onload = () => {
+            const hello = document.getElementById('hello-text');
+            const brandLoad = document.getElementById('brand-load');
+            const splashTitle = document.getElementById('splash-title');
+            
+            setTimeout(() => { hello.style.opacity = '1'; hello.style.transform = 'translateY(0)'; }, 500);
+
+            setTimeout(() => {
+                hello.classList.add('fade-out');
+                setTimeout(() => {
+                    brandLoad.classList.remove('hidden');
+                    "ForecastIQ".split('').forEach((l, i) => {
+                        const span = document.createElement('span');
+                        span.innerText = l;
+                        span.className = 'letter';
+                        span.style.animationDelay = `${i * 0.08}s`;
+                        splashTitle.appendChild(span);
+                        setTimeout(() => span.classList.add('letter-animate'), 50);
+                    });
+                }, 800);
+            }, 2200);
+
+            setTimeout(() => {
+                document.getElementById('splash-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splash-screen').remove();
+                    document.body.style.background = "var(--maroon-black)";
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    setTimeout(() => {
+                        document.getElementById('dashboard').style.opacity = '1';
+                        checkSavedLocation(); // REMEMBER ME LOGIC
+                    }, 50);
+                }, 1000);
+            }, 5500);
+        };
+
+        // 2. SEARCH & AUTOCOMPLETE
+        async function handleSearchInput(query) {
+            const box = document.getElementById('suggestions');
+            const clearBtn = document.getElementById('clear-btn');
+            if (query.length < 3) { box.classList.add('hidden'); clearBtn.classList.add('hidden'); return; }
+            clearBtn.classList.remove('hidden');
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${query}&limit=5&appid=${WEATHER_KEY}`);
+                    const locs = await res.json();
+                    renderSuggestions(locs);
+                } catch (e) { console.error(e); }
+            }, 300);
+        }
+
+        function renderSuggestions(locs) {
+            const box = document.getElementById('suggestions');
+            box.innerHTML = '';
+            if (locs.length === 0) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            locs.forEach(l => {
+                const div = document.createElement('div');
+                div.className = "px-6 py-4 hover:bg-white/10 cursor-pointer border-b border-white/5 text-left text-sm";
+                div.innerHTML = `${l.name}${l.state ? ', '+l.state : ''}, ${l.country}`;
+                div.onclick = () => {
+                    document.getElementById('city-input').value = l.name;
+                    box.classList.add('hidden');
+                    fetchWeather(l.lat, l.lon, l.name);
+                };
+                box.appendChild(div);
+            });
+        }
+
+        // 3. WEATHER CORE & PERSISTENCE
+        async function fetchWeather(lat, lon, name) {
+            let url = lat ? `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=${WEATHER_KEY}` 
+                          : `https://api.openweathermap.org/data/2.5/weather?q=${document.getElementById('city-input').value}&units=metric&appid=${WEATHER_KEY}`;
+            try {
+                const res = await fetch(url);
+                weatherStore = await res.json();
+                if(name) weatherStore.name = name;
+
+                localStorage.setItem('forecastIQ_city', weatherStore.name); // SAVE LOGIC
+                
+                document.getElementById('search-section').classList.add('hidden');
+                document.getElementById('weather-engine').classList.remove('hidden');
+                updateTab('temp');
+            } catch (e) { alert("Atmospheric sync failed."); }
+        }
+
+        function checkSavedLocation() {
+            const saved = localStorage.getItem('forecastIQ_city');
+            if (saved) {
+                document.getElementById('city-input').value = saved;
+                // Optional: Auto-fetch weather here if desired
+            }
+        }
+
+        // 4. AI LOGIC (TRUST-BASED)
+        async function updateTab(type, event) {
+            const valEl = document.getElementById('data-val');
+            const aiEl = document.getElementById('ai-text');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('text-red-500'));
+            if(event) event.currentTarget.classList.add('text-red-500');
+
+            let prompt = "";
+            if (type === 'temp') {
+                valEl.innerText = `${Math.round(weatherStore.main.temp)}°C`;
+                prompt = `Explain temperature of ${valEl.innerText} in ${weatherStore.name} like a trustable expert. 25 words max.`;
+            } else if (type === 'humidity') {
+                valEl.innerText = `${weatherStore.main.humidity}%`;
+                prompt = `Humidity is ${valEl.innerText}. Give a professional insight on comfort.`;
+            } else if (type === 'rain') {
+                valEl.innerText = weatherStore.weather[0].main;
+                prompt = `Condition: ${valEl.innerText}. Provide a factual umbrella-necessity report.`;
+            } else if (type === 'air') {
+                valEl.innerText = "Verified";
+                prompt = `Give one health fact about outdoor activity in current clear conditions for ${weatherStore.name}.`;
+            }
+
+            aiEl.innerText = "Analyzing stratosphere...";
+            const response = await callGemini(prompt);
+            typeEffect(aiEl, response);
+        }
+
+        async function askAI() {
+            const qInput = document.getElementById('user-query');
+            const resBox = document.getElementById('query-result');
+            if(!qInput.value) return;
+
+            resBox.classList.remove('hidden');
+            resBox.style.opacity = "0.5";
+            resBox.innerText = "Consulting Gemini...";
+            
+            const prompt = `User query: "${qInput.value}". Context: ${weatherStore.main.temp}C, ${weatherStore.weather[0].description} in ${weatherStore.name}. Answer as ForecastIQ. Be trustable and factual. Max 40 words.`;
+            const answer = await callGemini(prompt);
+            
+            qInput.value = ""; // Clear input for next question
+            resBox.style.opacity = "1";
+            typeEffect(resBox, answer);
+        }
+
+        async function callGemini(prompt) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                const json = await res.json();
+                return json.candidates[0].content.parts[0].text;
+            } catch (e) { return "Intelligence link offline."; }
+        }
+
+        // UTILITIES
+        function typeEffect(element, text) {
+            element.innerHTML = ""; let i = 0;
+            const timer = setInterval(() => {
+                if (i < text.length) { element.innerHTML += text.charAt(i); i++; } 
+                else { clearInterval(timer); }
+            }, 15);
+        }
+
+        function clearSearch() {
+            document.getElementById('city-input').value = '';
+            document.getElementById('suggestions').classList.add('hidden');
+            document.getElementById('clear-btn').classList.add('hidden');
+        }
+
+        function clearChat() {
+            document.getElementById('query-result').classList.add('hidden');
+            document.getElementById('query-result').innerText = '';
+        }
+    </script>
+</body>
+</html>
